@@ -29,6 +29,7 @@ catkin_package(
   )
 
 add_library(${PROJECT_NAME}
+  src/dsim_joint_position_controller.cpp
   src/joint_effort_controller.cpp
   src/joint_velocity_controller.cpp
   src/joint_position_controller.cpp
