@@ -39,26 +39,26 @@
  Desc: Effort(force)-based position controller using basic PID loop
 */
 
-#include <effort_controllers/joint_position_controller.h>
+#include <effort_controllers/dsim_joint_position_controller.h>
 #include <angles/angles.h>
 #include <pluginlib/class_list_macros.hpp>
 
-namespace dsim_effort_controllers {
+namespace effort_controllers {
 
 //This is our additional torque limit controller ROS
 double systemTorqueLimit;
 bool torqueAdditionsEnabled = false;
 
-JointPositionController::JointPositionController()
+DSIM_JointPositionController::DSIM_JointPositionController()
   : loop_count_(0)
 {}
 
-JointPositionController::~JointPositionController()
+DSIM_JointPositionController::~DSIM_JointPositionController()
 {
   sub_command_.shutdown();
 }
 
-bool JointPositionController::init(hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n)
+bool DSIM_JointPositionController::init(hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n)
 {
   // Get joint name from parameter server
   std::string joint_name;
@@ -77,7 +77,7 @@ bool JointPositionController::init(hardware_interface::EffortJointInterface *rob
     new realtime_tools::RealtimePublisher<control_msgs::JointControllerState>(n, "state", 1));
 
   // Start command subscriber
-  sub_command_ = n.subscribe<std_msgs::Float64>("command", 1, &JointPositionController::setCommandCB, this);
+  sub_command_ = n.subscribe<std_msgs::Float64>("command", 1, &DSIM_JointPositionController::setCommandCB, this);
 
   // Get joint handle from hardware interface
   joint_ = robot->getHandle(joint_name);
@@ -99,40 +99,40 @@ bool JointPositionController::init(hardware_interface::EffortJointInterface *rob
   return true;
 }
 
-void JointPositionController::setGains(const double &p, const double &i, const double &d, const double &i_max, const double &i_min, const bool &antiwindup)
+void DSIM_JointPositionController::setGains(const double &p, const double &i, const double &d, const double &i_max, const double &i_min, const bool &antiwindup)
 {
   systemTorqueLimit = i_max;
   pid_controller_.setGains(p,i,d,i_max,i_min,antiwindup);
 }
 
-void JointPositionController::getGains(double &p, double &i, double &d, double &i_max, double &i_min, bool &antiwindup)
+void DSIM_JointPositionController::getGains(double &p, double &i, double &d, double &i_max, double &i_min, bool &antiwindup)
 {
   pid_controller_.getGains(p,i,d,i_max,i_min,antiwindup);
 }
 
-void JointPositionController::getGains(double &p, double &i, double &d, double &i_max, double &i_min)
+void DSIM_JointPositionController::getGains(double &p, double &i, double &d, double &i_max, double &i_min)
 {
   bool dummy;
   pid_controller_.getGains(p,i,d,i_max,i_min,dummy);
 }
 
-void JointPositionController::printDebug()
+void DSIM_JointPositionController::printDebug()
 {
   pid_controller_.printValues();
 }
 
-std::string JointPositionController::getJointName()
+std::string DSIM_JointPositionController::getJointName()
 {
   return joint_.getName();
 }
 
-double JointPositionController::getPosition()
+double DSIM_JointPositionController::getPosition()
 {
   return joint_.getPosition();
 }
 
 // Set the joint position command
-void JointPositionController::setCommand(double pos_command)
+void DSIM_JointPositionController::setCommand(double pos_command)
 {
   command_struct_.position_ = pos_command;
   command_struct_.has_velocity_ = false; // Flag to ignore the velocity command since our setCommand method did not include it
@@ -144,7 +144,7 @@ void JointPositionController::setCommand(double pos_command)
 }
 
 // Set the joint position command with a velocity command as well
-void JointPositionController::setCommand(double pos_command, double vel_command)
+void DSIM_JointPositionController::setCommand(double pos_command, double vel_command)
 {
   command_struct_.position_ = pos_command;
   command_struct_.velocity_ = vel_command;
@@ -153,7 +153,7 @@ void JointPositionController::setCommand(double pos_command, double vel_command)
   command_.writeFromNonRT(command_struct_);
 }
 
-void JointPositionController::setCommand(double pos_command, bool torque_cntl, double tor_command)
+void DSIM_JointPositionController::setCommand(double pos_command, bool torque_cntl, double tor_command)
 {
   command_struct_.position_ = pos_command;
   command_struct_.has_velocity_ = false; // Flag to ignore the velocity command since our setCommand method did not include it
@@ -166,7 +166,7 @@ void JointPositionController::setCommand(double pos_command, bool torque_cntl, d
   command_.writeFromNonRT(command_struct_);
 }
 
-void JointPositionController::starting(const ros::Time& time)
+void DSIM_JointPositionController::starting(const ros::Time& time)
 {
   double pos_command = joint_.getPosition();
 
@@ -181,7 +181,7 @@ void JointPositionController::starting(const ros::Time& time)
   pid_controller_.reset();
 }
 
-void JointPositionController::update(const ros::Time& time, const ros::Duration& period)
+void DSIM_JointPositionController::update(const ros::Time& time, const ros::Duration& period)
 {
   command_struct_ = *(command_.readFromRT());
   double command_position = command_struct_.position_;
@@ -266,13 +266,13 @@ void JointPositionController::update(const ros::Time& time, const ros::Duration&
   loop_count_++;
 }
 
-void JointPositionController::setCommandCB(const std_msgs::Float64ConstPtr& msg)
+void DSIM_JointPositionController::setCommandCB(const std_msgs::Float64ConstPtr& msg)
 {
   setCommand(msg->data);
 }
 
 // Note: we may want to remove this function once issue https://github.com/ros/angles/issues/2 is resolved
-void JointPositionController::enforceJointLimits(double &command)
+void DSIM_JointPositionController::enforceJointLimits(double &command)
 {
   // Check that this joint has applicable limits
   if (joint_urdf_->type == urdf::Joint::REVOLUTE || joint_urdf_->type == urdf::Joint::PRISMATIC)
@@ -290,4 +290,4 @@ void JointPositionController::enforceJointLimits(double &command)
 
 } // namespace
 
-PLUGINLIB_EXPORT_CLASS( effort_controllers::JointPositionController, controller_interface::ControllerBase)
+PLUGINLIB_EXPORT_CLASS( effort_controllers::DSIM_JointPositionController, controller_interface::ControllerBase)

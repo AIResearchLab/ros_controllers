@@ -75,7 +75,7 @@
 namespace effort_controllers
 {
 
-class JointPositionController: public controller_interface::Controller<hardware_interface::EffortJointInterface>
+class DSIM_JointPositionController: public controller_interface::Controller<hardware_interface::EffortJointInterface>
 {
 public:
 
@@ -89,8 +89,8 @@ public:
     bool has_velocity_; // false if no velocity command has been specified
   };
 
-  JointPositionController();
-  ~JointPositionController();
+  DSIM_JointPositionController();
+  ~DSIM_JointPositionController();
 
   /** \brief The init function is called to initialize the controller from a
    * non-realtime thread with a pointer to the hardware interface, itself,
