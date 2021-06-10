@@ -1,3 +1,7 @@
+UC alterations descriptions
+===============
+We slighyly modify the effort based torque controller to simulate dynamixel motor commands, this is done by limiting the applied torque to the actuators, at least initially
+
 ros_controllers
 ===============
 
