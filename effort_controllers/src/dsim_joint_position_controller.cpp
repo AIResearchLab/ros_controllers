@@ -45,10 +45,6 @@
 
 namespace effort_controllers {
 
-//This is our additional torque limit controller ROS
-double systemTorqueLimit;
-bool torqueAdditionsEnabled = false;
-
 DSIM_JointPositionController::DSIM_JointPositionController()
   : loop_count_(0)
 {}
@@ -56,10 +52,13 @@ DSIM_JointPositionController::DSIM_JointPositionController()
 DSIM_JointPositionController::~DSIM_JointPositionController()
 {
   sub_command_.shutdown();
+  sub_dynamixel_command.shutdown();
 }
 
 bool DSIM_JointPositionController::init(hardware_interface::EffortJointInterface *robot, ros::NodeHandle &n)
 {
+  accelerationProfile = 0.1;
+  velocityProfile = 0.1;
   // Get joint name from parameter server
   std::string joint_name;
   if (!n.getParam("joint", joint_name))
@@ -78,6 +77,8 @@ bool DSIM_JointPositionController::init(hardware_interface::EffortJointInterface
 
   // Start command subscriber
   sub_command_ = n.subscribe<std_msgs::Float64>("command", 1, &DSIM_JointPositionController::setCommandCB, this);
+  
+  sub_dynamixel_command = n.subscribe("dyna_command", 1, &DSIM_JointPositionController::setDynaCommand, this);
 
   // Get joint handle from hardware interface
   joint_ = robot->getHandle(joint_name);
@@ -101,7 +102,6 @@ bool DSIM_JointPositionController::init(hardware_interface::EffortJointInterface
 
 void DSIM_JointPositionController::setGains(const double &p, const double &i, const double &d, const double &i_max, const double &i_min, const bool &antiwindup)
 {
-  systemTorqueLimit = i_max;
   pid_controller_.setGains(p,i,d,i_max,i_min,antiwindup);
 }
 
@@ -150,19 +150,6 @@ void DSIM_JointPositionController::setCommand(double pos_command, double vel_com
   command_struct_.velocity_ = vel_command;
   command_struct_.has_velocity_ = true;
 
-  command_.writeFromNonRT(command_struct_);
-}
-
-void DSIM_JointPositionController::setCommand(double pos_command, bool torque_cntl, double tor_command)
-{
-  command_struct_.position_ = pos_command;
-  command_struct_.has_velocity_ = false; // Flag to ignore the velocity command since our setCommand method did not include it
-  //these commands enable the torque limit thus mimicking the dynamixe actuator behavoir
-  torqueAdditionsEnabled = true;
-  systemTorqueLimit = tor_command;
-  // the writeFromNonRT can be used in RT, if you have the guarantee that
-  //  * no non-rt thread is calling the same function (we're not subscribing to ros callbacks)
-  //  * there is only one single rt thread
   command_.writeFromNonRT(command_struct_);
 }
 
@@ -232,8 +219,8 @@ void DSIM_JointPositionController::update(const ros::Time& time, const ros::Dura
     commanded_effort = pid_controller_.computeCommand(error, period);
   }
   
-  if(commanded_effort>systemTorqueLimit){
-     commanded_effort=systemTorqueLimit; 
+  if(commanded_effort>command_struct_.torque_){
+     commanded_effort=command_struct_.torque_; 
   }
 
   joint_.setCommand(commanded_effort);
@@ -271,6 +258,11 @@ void DSIM_JointPositionController::setCommandCB(const std_msgs::Float64ConstPtr&
   setCommand(msg->data);
 }
 
+void DSIM_JointPositionController::setDynaCommand(const control_msgs::DSIM_controller& msg)
+{
+  //here we process the message to 
+  setCommand(0);
+}
 // Note: we may want to remove this function once issue https://github.com/ros/angles/issues/2 is resolved
 void DSIM_JointPositionController::enforceJointLimits(double &command)
 {

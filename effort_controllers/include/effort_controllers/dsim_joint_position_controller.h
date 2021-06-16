@@ -39,24 +39,16 @@
 /**
    @class effort_controllers::JointPositionController
    @brief Joint Position Controller
-
    This class controls positon using a pid loop.
-
    @section ROS ROS interface
-
    @param type Must be "effort_controllers::JointPositionController"
    @param joint Name of the joint to control.
    @param pid Contains the gains for the PID loop around position.  See: control_toolbox::Pid
-
    Subscribes to:
-
    - @b command (std_msgs::Float64) : The joint position to achieve.
-
    Publishes:
-
    - @b state (control_msgs::JointControllerState) :
      Current state of the controller, including pid error and gains.
-
 */
 
 #include <ros/node_handle.h>
@@ -68,6 +60,7 @@
 #include <hardware_interface/joint_command_interface.h>
 #include <controller_interface/controller.h>
 #include <control_msgs/JointControllerState.h>
+#include <control_msgs/DSIM_controller.h>
 #include <std_msgs/Float64.h>
 #include <control_msgs/JointControllerState.h>
 #include <realtime_tools/realtime_buffer.h>
@@ -78,7 +71,6 @@ namespace effort_controllers
 class DSIM_JointPositionController: public controller_interface::Controller<hardware_interface::EffortJointInterface>
 {
 public:
-
   /**
    * \brief Store position and velocity command in struct to allow easier realtime buffer usage
    */
@@ -87,6 +79,7 @@ public:
     double position_; // Last commanded position
     double velocity_; // Last commanded velocity
     bool has_velocity_; // false if no velocity command has been specified
+    double torque_;
   };
 
   DSIM_JointPositionController();
@@ -113,15 +106,6 @@ public:
    * \param command
    */
   void setCommand(double pos_target);
-
-  /*!
-   * \brief allow target torque and custom controller to be enabled, this is big hack by david
-   *
-   * \param pos_target - position setpoint
-   * \param torque_cntl - is torque limit set?
-   * \param tor_command - torque limit
-   */
-  void setCommand(double pos_command, bool torque_cntl, double tor_command);
 
   /*!
    * \brief Give set position of the joint for next update: revolute (angle) and prismatic (position)
@@ -181,6 +165,10 @@ public:
   Commands command_struct_; // pre-allocated memory that is re-used to set the realtime buffer
 
 private:
+  //this section hosts the additional acceleration and velocity components
+  double accelerationProfile;
+  double velocityProfile;
+
   int loop_count_;
   control_toolbox::Pid pid_controller_;       /**< Internal PID controller. */
 
@@ -189,12 +177,17 @@ private:
       control_msgs::JointControllerState> > controller_state_publisher_ ;
 
   ros::Subscriber sub_command_;
+  ros::Subscriber sub_dynamixel_command;
 
   /**
    * \brief Callback from /command subscriber for setpoint
    */
   void setCommandCB(const std_msgs::Float64ConstPtr& msg);
 
+    /**
+   * \brief Callback from /command subscriber for setpoint
+   */
+  void setDynaCommand(const control_msgs::DSIM_controller& msg);
   /**
    * \brief Check that the command is within the hard limits of the joint. Checks for joint
    *        type first. Sets command to limit if out of bounds.
